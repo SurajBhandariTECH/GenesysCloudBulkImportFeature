@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<organizations>
+	<organization>
+		<name>CognizantIT</name>
+		<clientId>7a85edc4-9fab-4e5a-99b4-2dba8272e073</clientId>
+		<clientSecret>-MQF-2_noLtNYbgFRw1XPMZgQfJdsc8h-PwzE1zXyWI</clientSecret>
+	</organization>
+	
+	<organization>
+		<name>DisfrutaGlobal0091US1</name>
+		<clientId>d1e380d5-aa10-4eed-908f-5625fd342f79</clientId>
+		<clientSecret>M6khOP5e-RpVex3GKNglaR6OqKAInZJF45NLrNDb_jY</clientSecret>
+	</organization>
+
+</organizations>

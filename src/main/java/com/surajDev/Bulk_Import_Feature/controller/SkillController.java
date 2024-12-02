@@ -1,4 +1,4 @@
-package com.example.Bulk_Skill_Creation.controller;
+package com.surajDev.Bulk_Import_Feature.controller;
 
 import java.io.IOException;
 import java.util.List;
@@ -15,11 +15,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import com.example.Bulk_Skill_Creation.service.GenesysServices;
-import com.example.Bulk_Skill_Creation.service.LanguageSkillServices;
-import com.example.Bulk_Skill_Creation.service.OrgConfigService;
 import com.mypurecloud.sdk.v2.ApiClient;
 import com.mypurecloud.sdk.v2.Configuration;
+import com.surajDev.Bulk_Import_Feature.service.GenesysServices;
+import com.surajDev.Bulk_Import_Feature.service.LanguageSkillServices;
+import com.surajDev.Bulk_Import_Feature.service.OrgConfigService;
 
 import jakarta.servlet.http.HttpSession;
 

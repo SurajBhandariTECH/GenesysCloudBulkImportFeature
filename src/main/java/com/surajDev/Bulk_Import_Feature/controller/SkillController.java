@@ -147,7 +147,7 @@ public class SkillController {
 	}
 	
 	@GetMapping("/deleteSkill")
-    public String showUploadWrapUpCodePage(HttpSession session, Model model) {
+    public String showUploadSkillPage(HttpSession session, Model model) {
 		String organizationName = (String) session.getAttribute("organizationName");
 	    String environment = (String) session.getAttribute("environment");
 
@@ -182,6 +182,25 @@ public class SkillController {
 
         return "uploadLanguageSkill"; // Create this page for Language Skill upload
     }
+    
+    //show the upload language skill page for deleting languageSkill
+    @GetMapping("/deleteLanguageSkill")
+    public String showDeleteLangaugeSkillPage(HttpSession session, Model model) {
+		String organizationName = (String) session.getAttribute("organizationName");
+	    String environment = (String) session.getAttribute("environment");
+
+	    if (organizationName == null || environment == null) {
+	        model.addAttribute("errorMessage", "Session expired. Please log in again.");
+	        return "login";
+	    }
+
+	    String confirmationMessage = "Connected to Genesys org: " + organizationName;
+	    model.addAttribute("confirmationMessage", confirmationMessage);
+	    model.addAttribute("organizationName", organizationName);
+	    model.addAttribute("environment", environment);
+
+	    return "uploadLanguageSkill";
+    }
 
     // Show upload page for Bulk Wrap-Up Code
     @GetMapping("/uploadWrapUpCode")
@@ -202,6 +221,7 @@ public class SkillController {
         
     }
     
+    //handle the deletion of skill
     @PostMapping("/deleteSkill")
     public String handleDeleteSkillFileUpload(@RequestParam("file")MultipartFile file,
     		HttpSession session,
@@ -219,6 +239,16 @@ public class SkillController {
                                                 Model model) {
     	
         return handleLanguageSkillFile(file, httpSession, model,redirectAttributes);
+    }
+    
+    //handle deletion of language skills
+    @PostMapping("/deleteLanguageSkill")
+    public String handleDeleteLanguageSkill(@RequestParam("file")MultipartFile file,
+    		HttpSession session,
+    		Model model,
+    		RedirectAttributes redirectAttributes) {
+    	return handleDeleteLanguageSkillFile(file,session,model,redirectAttributes);
+    	
     }
 	
  // Handle File Upload for Bulk Wrap-Up Code (with different validation and functionality)
@@ -356,6 +386,46 @@ public class SkillController {
         }
 
         return "upload";
+    }
+	
+	private String handleDeleteLanguageSkillFile(MultipartFile file, HttpSession session,
+			Model model, RedirectAttributes redirectAttributes) {
+		try {
+			
+			 String organizationName = (String) session.getAttribute("organizationName");
+	            String environment = (String) session.getAttribute("environment");
+
+	            if (organizationName == null || environment == null) {
+	                model.addAttribute("errorMessage", "Session expired. Please log in again.");
+	                return "login";
+	            }
+	            
+	            @SuppressWarnings("unchecked")
+	            Map<String, String> credentials = (Map<String, String>) session.getAttribute("credentials");
+	            if (credentials == null || !orgConfigService.validateCredentials(credentials, environment)) {
+	                throw new IllegalArgumentException("Client credentials have changed or are invalid. Please log in again.");
+	            }
+	            
+	            //process the CSV file and delete skills
+	            List<String> results = languageSkillServices.deleteLanguageSkillsFromCSV(file, organizationName, environment);
+	            
+	            model.addAttribute("confirmationMessage", "Connected to Genesys org: " + organizationName);
+	            model.addAttribute("results", results);
+	            model.addAttribute("successMessage", "file upload successfully.");
+		}
+		
+		catch (IllegalArgumentException e) {
+            model.addAttribute("errorMessage", e.getMessage());
+            return "login";
+        } catch (IOException e) {
+            model.addAttribute("errorMessage", "File processing error: " + e.getMessage());
+            return "uploadLanguageSkill";
+        } catch (Exception e) {
+            model.addAttribute("errorMessage", "Error processing the file: " + e.getMessage());
+            return "uploadLanguageSkill";
+        }
+
+        return "uploadLanguageSkill";
     }
 	
 	private String handleWrapUpCodeUpload(MultipartFile file, HttpSession session, Model model) {

@@ -1,10 +1,10 @@
-package com.example.Bulk_Skill_Creation;
+package com.surajDev.Bulk_Import_Feature;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class BulkSkillCreationApplicationTests {
+class GenesysCloudBulkImportFeatureTest {
 
 	@Test
 	void contextLoads() {

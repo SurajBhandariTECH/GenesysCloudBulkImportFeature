@@ -1,3 +1,4 @@
+
 package com.surajDev.Bulk_Import_Feature.service;
 
 
@@ -99,7 +100,7 @@ public class GenesysServices {
 			Configuration.setDefaultApiClient(apiClient);
 			
 			 RoutingApi routingApi = new RoutingApi(apiClient);
-			 SkillEntityListing skillEntityListing = new SkillEntityListing();
+			 
 			
 			// Parse the CSV to extract skill names
 	        List<String> skillNames = parseCSVDelete(file);

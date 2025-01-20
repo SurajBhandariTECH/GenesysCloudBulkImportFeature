@@ -20,12 +20,16 @@ import com.mypurecloud.sdk.v2.Configuration;
 import com.surajDev.Bulk_Import_Feature.service.GenesysServices;
 import com.surajDev.Bulk_Import_Feature.service.LanguageSkillServices;
 import com.surajDev.Bulk_Import_Feature.service.OrgConfigService;
+import com.surajDev.Bulk_Import_Feature.service.UserService;
+import com.surajDev.Bulk_Import_Feature.service.WrapUpCodeServices;
+import com.mypurecloud.sdk.v2.ApiClient;
+import com.mypurecloud.sdk.v2.Configuration;
 
 import jakarta.servlet.http.HttpSession;
 
 
 @Controller
-@RequestMapping("/skills")
+@RequestMapping("/genesysContactCenter")
 public class SkillController {
 	
 	@Autowired
@@ -36,6 +40,11 @@ public class SkillController {
 	
 	@Autowired
 	private LanguageSkillServices languageSkillServices;
+	
+	@Autowired
+	private WrapUpCodeServices wrapUpCodeService;
+	
+	@Autowired UserService userService;
 	
 	public SkillController(GenesysServices genesysService) {
 		this.genesysService = genesysService;
@@ -89,7 +98,7 @@ public class SkillController {
 		//save organization and environment in session or attributes for next page
 		redirectAttributes.addFlashAttribute("organizationName",organizationName);
 		redirectAttributes.addFlashAttribute("environment",environment);
-		return "redirect:/skills/importOptions";
+		return "redirect:/genesysContactCenter/importOptions";
 		
 	}catch(IllegalArgumentException e) {
 		model.addAttribute("errorMessage",e.getMessage());
@@ -202,16 +211,61 @@ public class SkillController {
 	    return "uploadLanguageSkill";
     }
 
-    // Show upload page for Bulk Wrap-Up Code
-    @GetMapping("/uploadWrapUpCode")
-    public String showUploadWrapUpCodePage(@ModelAttribute("organizationName") String organizationName,
-                                           @ModelAttribute("environment") String environment,
-                                           @ModelAttribute("confirmationMessage") String confirmationMessage, Model model) {
-        model.addAttribute("organizationName", organizationName);
-        model.addAttribute("environment", environment);
-        model.addAttribute("confirmationMessage", confirmationMessage); // Add confirmation message to model
-        return "uploadWrapUpCode"; // Create this page for Wrap-Up Code upload
-    }
+	@GetMapping("/uploadWrapUpCode")
+	
+	public String uploadWrapUpCodePage(HttpSession session, Model model) {
+		String organizationName = (String)session.getAttribute("organizationName");
+		String environment = (String)session.getAttribute("environment");
+		
+		if(organizationName == null || environment == null) {
+			model.addAttribute("errorMessage","Session expired. Please log in again");
+			return "login";
+		}
+		
+		String confirmationMessage = "Connected to genesys org: "+ organizationName;
+		model.addAttribute("organizationName", organizationName);
+		model.addAttribute("environment",environment);
+		model.addAttribute("confirmationMessage",confirmationMessage);
+		
+		return "uploadWrapUpCode";
+	}
+    
+	@GetMapping("/deleteWrapUpCode")
+	
+	public String deleteWrapUpCodePage(HttpSession session, Model model) {
+		String organizationName = (String)session.getAttribute("organizationName");
+		String environment = (String)session.getAttribute("environment");
+		
+		if(organizationName == null || environment == null) {
+			model.addAttribute("errorMessage","Session expired. Please log in again");
+			return "login";
+		}
+		
+		String confirmationMessage = "Connected to genesys org: "+ organizationName;
+		model.addAttribute("organizationName", organizationName);
+		model.addAttribute("environment",environment);
+		model.addAttribute("confirmationMessage",confirmationMessage);
+		
+		return "uploadWrapUpCode";
+	}
+	
+	@GetMapping("/uploadUser")
+	public String EmployeerInfoUpdation(HttpSession httpSession, Model model) {
+		String organizationName = (String)httpSession.getAttribute("organizationName");
+		String environment = (String)httpSession.getAttribute("environment");
+		
+		if(organizationName == null || environment == null) {
+			model.addAttribute("errorMessage","Session expired. Please log in again");
+			return "login";
+			
+		}
+		String confirmationMessage = "Connected to genesys org: "+organizationName;
+		model.addAttribute("organizationName",organizationName);
+		model.addAttribute("environment",environment);
+		model.addAttribute("confirmationMessage",confirmationMessage);
+		return "uploadUser";
+		
+	}
     
     @PostMapping("/upload")
     public String handleSkillFileUpload(@RequestParam("file") MultipartFile file,
@@ -253,11 +307,29 @@ public class SkillController {
 	
  // Handle File Upload for Bulk Wrap-Up Code (with different validation and functionality)
     @PostMapping("/uploadWrapUpCode")
-    public String handleWrapUpCodeFileUpload(@RequestParam("file") MultipartFile file,
-                                              HttpSession session, Model model) {
-        return handleWrapUpCodeUpload(file, session, model);
+	public String handleWrapUpCodeFileUpload(@RequestParam("file")MultipartFile file,
+			HttpSession httpSession,
+			RedirectAttributes redirectAttributes,
+			Model model) {
+		return handleWrapUpCodeFile(file,httpSession,redirectAttributes,model);
+	}
+    
+    @PostMapping("/deleteWrapUpCode")
+    public String handleDeletewrapUpCode(@RequestParam("file")MultipartFile file,
+    		HttpSession session,
+    		Model model,
+    		RedirectAttributes redirectAttributes) {
+    	return handleDeleteWrapUpCodeFile(file,session,model,redirectAttributes);
+    	
     }
     
+    @PostMapping("/uploadUser")
+    public String handleUserUpdate(@RequestParam("file")MultipartFile file,
+    		HttpSession session, 
+    		RedirectAttributes redirectAttributes,
+    		Model model) {
+    	return handleUserEmployerInfoFile(file, session, model, redirectAttributes);
+    }
 	// Handle File Upload
 	
 	
@@ -428,40 +500,120 @@ public class SkillController {
         return "uploadLanguageSkill";
     }
 	
-	private String handleWrapUpCodeUpload(MultipartFile file, HttpSession session, Model model) {
-        try {
-            String organizationName = (String) session.getAttribute("organizationName");
-            String environment = (String) session.getAttribute("environment");
-
-            if (organizationName == null || environment == null) {
-                model.addAttribute("errorMessage", "Session expired. Please log in again.");
-                return "login";
-            }
-
-            @SuppressWarnings("unchecked")
-            Map<String, String> credentials = (Map<String, String>) session.getAttribute("credentials");
-            if (credentials == null || !orgConfigService.validateCredentials(credentials, environment)) {
-                throw new IllegalArgumentException("Client credentials have changed or are invalid. Please log in again.");
-            }
-
-            // Custom validation and processing for Wrap-Up Code
-            List<String> results = genesysService.createWrapUpCodeFromCsv(file, organizationName, environment);
-
-            model.addAttribute("confirmationMessage", "Connected to Genesys org: " + organizationName);
-            model.addAttribute("results", results);
-            model.addAttribute("successMessage", "Wrap-Up Code uploaded successfully.");
-
-        } catch (IllegalArgumentException e) {
-            model.addAttribute("errorMessage", e.getMessage());
-            return "login";
-        } catch (Exception e) {
-            model.addAttribute("errorMessage", "Error processing the file: " + e.getMessage());
-            return "uploadWrapUpCode";
-        }
-
-        return "uploadWrapUpCode";
-    }
-	
+	//handle file upload
+		public String handleWrapUpCodeFile(MultipartFile file, HttpSession httpSession, RedirectAttributes redirectAttributes,Model model) {
+			try {
+				
+				String organizationName = (String)httpSession.getAttribute("organizationName");
+				String environment = (String)httpSession.getAttribute("environment");
+				
+				if(organizationName==null || environment==null) {
+					model.addAttribute("errorMessage","Session expired. Please login in again.");
+					return "login";
+					}
+			
+				@SuppressWarnings("unchecked")
+				Map<String, String> credentials = (Map<String,String>) httpSession.getAttribute("credentials");
+				if(credentials ==null || !orgConfigService.validateCredentials(credentials,environment)) {
+						throw new IllegalArgumentException("Client credentials have changed or are invalid. Please log in again:");
+					}
+				
+		//process the CSV file and create Skill
+				List<String> results = wrapUpCodeService.createWrapUpCodeFromCSV(file, organizationName,environment);
+		//add the confirmation message and results to the redirect attributes so it can be displayed in the success message
+				model.addAttribute("confirmationMessage","Connect to Genesys org:"+organizationName);
+				model.addAttribute("results",results);
+				model.addAttribute("successMessage","WrapUpCode File Upload successfully");
 		
+//				redirectAttributes.addFlashAttribute("results",results);
+				
+			}catch(IllegalArgumentException e) {
+				model.addAttribute("errorMessage"+ e.getLocalizedMessage());
+				return "login";
+			}catch(IOException e) {
+				model.addAttribute("errorMessage","File process error: "+e.getMessage());
+				return "uploadWrapUpCode";
+			}catch(Exception e) {
+				model.addAttribute("errorMessage","Error processing the files:"+e.getMessage());
+				return "uploadWrapUpCode";
+			}
+		return "uploadWrapUpCode";
+		}
+	
+		private String handleDeleteWrapUpCodeFile(MultipartFile file, HttpSession session,
+				Model model, RedirectAttributes redirectAttributes) {
+			try {
+				
+				 String organizationName = (String) session.getAttribute("organizationName");
+		            String environment = (String) session.getAttribute("environment");
+
+		            if (organizationName == null || environment == null) {
+		                model.addAttribute("errorMessage", "Session expired. Please log in again.");
+		                return "login";
+		            }
+		            
+		            @SuppressWarnings("unchecked")
+		            Map<String, String> credentials = (Map<String, String>) session.getAttribute("credentials");
+		            if (credentials == null || !orgConfigService.validateCredentials(credentials, environment)) {
+		                throw new IllegalArgumentException("Client credentials have changed or are invalid. Please log in again.");
+		            }
+		            
+		            //process the CSV file and delete skills
+		            List<String> results = wrapUpCodeService.deleteWrapUpCodeFromCSV(file, organizationName, environment);
+		            
+		            model.addAttribute("confirmationMessage", "Connected to Genesys org: " + organizationName);
+		            model.addAttribute("results", results);
+		            model.addAttribute("successMessage", "file upload successfully.");
+			}
+			
+			catch (IllegalArgumentException e) {
+	            model.addAttribute("errorMessage", e.getMessage());
+	            return "login";
+	        } catch (IOException e) {
+	            model.addAttribute("errorMessage", "File processing error: " + e.getMessage());
+	            return "uploadWrapUpCode";
+	        } catch (Exception e) {
+	            model.addAttribute("errorMessage", "Error processing the file: " + e.getMessage());
+	            return "uploadWrapUpCode";
+	        }
+
+	        return "uploadWrapUpCode";
+	    }
+		
+		public String handleUserEmployerInfoFile(MultipartFile file, HttpSession session,
+				Model model, RedirectAttributes redirectAttributes) {
+			try {
+				 String organizationName = (String) session.getAttribute("organizationName");
+		            String environment = (String) session.getAttribute("environment");
+
+		            if (organizationName == null || environment == null) {
+		                model.addAttribute("errorMessage", "Session expired. Please log in again.");
+		                return "login";
+		            }
+		            @SuppressWarnings("unchecked")
+					Map<String, String> credentials = (Map<String,String>)session.getAttribute("credentials");
+		            
+		            if (credentials == null || !orgConfigService.validateCredentials(credentials, environment)) {
+		                throw new IllegalArgumentException("Client credentials have changed or are invalid. Please log in again.");
+		            }
+		            
+		            List<String> results = userService.updateUsersFromCsv(file, organizationName, environment);
+		            	model.addAttribute("confirmationMessage", "Connected to Genesys org: " + organizationName);
+			            model.addAttribute("results", results);
+			            model.addAttribute("successMessage", "file upload successfully.");
+		            
+			}catch (IllegalArgumentException e) {
+	            model.addAttribute("errorMessage", e.getMessage());
+	            return "login";
+	        } catch (IOException e) {
+	            model.addAttribute("errorMessage", "File processing error: " + e.getMessage());
+	            return "uploadUser";
+	        } catch (Exception e) {
+	            model.addAttribute("errorMessage", "Error processing the file: " + e.getMessage());
+	            return "uploadUser";
+	        }
+			
+			return "uploadUser";
+		}
 	
 }

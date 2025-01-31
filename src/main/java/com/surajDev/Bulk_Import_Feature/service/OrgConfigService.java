@@ -21,86 +21,107 @@ import jakarta.annotation.PostConstruct;
 
 @Service
 public class OrgConfigService {
-	
-	private final Map<String, Map<String, String>> orgConfig= new HashMap<>();
-	
-	public List<String> getAvailableOrganizations(){
+
+	private final Map<String, Map<String, String>> orgConfig = new HashMap<>();
+
+	public List<String> getAvailableOrganizations() {
 		List<String> organizationName = new ArrayList<>();
 		try {
-				//load and parse the xml file
+			// load and parse the xml file
 			ClassPathResource resource = new ClassPathResource("org-config.xml");
-			if(!resource.exists()) {
-					throw new IllegalStateException("Org-config.xml not found in the classpath");
-				}
+			if (!resource.exists()) {
+				throw new IllegalStateException("Org-config.xml not found in the classpath");
+			}
 			InputStream inputStream = resource.getInputStream();
-			
+
 			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 			DocumentBuilder builder = factory.newDocumentBuilder();
 			Document document = builder.parse(inputStream);
-			
+
 			NodeList organizations = document.getElementsByTagName("organization");
-			
-			for(int i=0; i<organizations.getLength();i++) {
+
+			for (int i = 0; i < organizations.getLength(); i++) {
 				Element orgElement = (Element) organizations.item(i);
-				
+
 				String name = orgElement.getElementsByTagName("name").item(0).getTextContent().trim();
 				organizationName.add(name);
-				}
-			}catch(Exception e) {
-			 e.printStackTrace();
 			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 		return organizationName;
 	}
-	
+
 	@PostConstruct
 	public void loadConfig() throws Exception {
-		
-		
-		//use classpathresource to load from resource folder
+
+		// use classpathresource to load from resource folder
 		ClassPathResource resource = new ClassPathResource("org-config.xml");
-		if(!resource.exists()) {
+		if (!resource.exists()) {
 			throw new IllegalStateException("Org-config.xml not found in the classpath");
 		}
 		InputStream inputStream = resource.getInputStream();
-		
+
 		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 		DocumentBuilder builder = factory.newDocumentBuilder();
 		Document document = builder.parse(inputStream);
-		
+
 		NodeList organizations = document.getElementsByTagName("organization");
-		
-		for(int i=0; i<organizations.getLength();i++) {
+
+		for (int i = 0; i < organizations.getLength(); i++) {
 			Element orgElement = (Element) organizations.item(i);
-			
+
 			String name = orgElement.getElementsByTagName("name").item(0).getTextContent().trim();
 			String clientId = orgElement.getElementsByTagName("clientId").item(0).getTextContent().trim();
-			String clientSecret = orgElement.getElementsByTagName("clientSecret").item(0).getTextContent().trim();
-			
-//			System.out.println("sssss"+clientId);
+			String redirectUri = orgElement.getElementsByTagName("redirectUri").item(0).getTextContent().trim();
+
+			// System.out.println("sssss"+clientId);
 			Map<String, String> credentials = new HashMap<>();
 			credentials.put("clientId", clientId);
-			credentials.put("clientSecret", clientSecret);
+			credentials.put("redirectUri", redirectUri);
 			orgConfig.put(name, credentials);
 		}
 	}
-	
-	public boolean validateCredentials(Map<String,String> credentials, String environment) {
+
+	public String getClientId(String orgName) {
+		Map<String, String> credentials = orgConfig.get(orgName);
+		return credentials != null ? credentials.get("clientId") : null;
+	}
+
+	public String getRedirectUri(String orgName) {
+		Map<String, String> credentials = orgConfig.get(orgName);
+		return credentials != null ? credentials.get("redirectUri") : null;
+	}
+
+	public boolean validateAccessToken(String accessToken, String environment) {
 		try {
-			String clientId = credentials.get("clientId");
-			String clientSecret = credentials.get("clientSecret");
-			
-			ApiClient apiClient=ApiClient.Builder.standard().withBasePath("https://api."+environment).build();
-			apiClient.authorizeClientCredentials(clientId, clientSecret);
-			
-			//if no exception occurs, credentials are valid
+
+			// connecting to the genesys based on accesstoken
+			ApiClient apiClient = ApiClient.Builder.standard().withAccessToken(accessToken)
+					.withBasePath("https://api." + environment).build();
+
+			// set ApiClient as default
+			Configuration.setDefaultApiClient(apiClient);
+
+			// use userAPi to fetch the current user
+
+			UsersApi userApi = new UsersApi(apiClient);
+			List<String> expand = Arrays.asList("");
+			String integrationPresenceSource = "";
+
+			UserMe result = userApi.getUsersMe(expand, integrationPresenceSource);
+
+			System.out.println(result); // if no exceptions occurs, the token is valid
 			return true;
-		}catch(Exception e) {
-			//if exception occur, credentials are invalid
+
+		} catch (Exception e) {
+			// if exception occur the token is invalid
+			System.out.print(e);
 			return false;
 		}
 	}
-	
-	public Map<String,String> getCredentials(String orgName){
+
+	public Map<String, String> getCredentials(String orgName) {
 		return orgConfig.get(orgName);
 	}
 }

@@ -1,32 +1,39 @@
-package com.surajDev.Bulk_Import_Feature.controller;
+package com.example.Bulk_Skill_Creation.controller;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.example.Bulk_Skill_Creation.service.GenesysServices;
+import com.example.Bulk_Skill_Creation.service.LanguageSkillServices;
+import com.example.Bulk_Skill_Creation.service.OrgConfigService;
+import com.example.Bulk_Skill_Creation.service.UserService;
+import com.example.Bulk_Skill_Creation.service.WrapUpCodeServices;
 import com.mypurecloud.sdk.v2.ApiClient;
 import com.mypurecloud.sdk.v2.Configuration;
-import com.surajDev.Bulk_Import_Feature.service.GenesysServices;
-import com.surajDev.Bulk_Import_Feature.service.LanguageSkillServices;
-import com.surajDev.Bulk_Import_Feature.service.OrgConfigService;
-import com.surajDev.Bulk_Import_Feature.service.UserService;
-import com.surajDev.Bulk_Import_Feature.service.WrapUpCodeServices;
-import com.mypurecloud.sdk.v2.ApiClient;
-import com.mypurecloud.sdk.v2.Configuration;
+import com.mypurecloud.sdk.v2.api.AuthorizationApi;
+import com.mypurecloud.sdk.v2.api.OrganizationApi;
+import com.mypurecloud.sdk.v2.api.UsersApi;
+import com.mypurecloud.sdk.v2.model.DomainRole;
+import com.mypurecloud.sdk.v2.model.Organization;
+import com.mypurecloud.sdk.v2.model.UserAuthorization;
+import com.mypurecloud.sdk.v2.model.UserMe;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
-
 
 @Controller
 @RequestMapping("/genesysContactCenter")
@@ -46,8 +53,8 @@ public class SkillController {
 
 	@Autowired
 	UserService userService;
-	
-	private static final String requriedRole = "custom-Import-Role"; 
+
+	private static final String requriedRole = "custom-Import-Role";
 
 	public SkillController(GenesysServices genesysService) {
 		this.genesysService = genesysService;
@@ -56,30 +63,30 @@ public class SkillController {
 	// Show login form
 	@GetMapping("/login")
 	public String showLoginForm(Model model) {
-		// model.addAttribute("environment",List.of("mypurecloud.com","usw2.pure.cloud","eu.pure.cloud"));
 		model.addAttribute("organizationName", orgConfigService.getAvailableOrganizations());
 		return "login";
 	}
 
 	@GetMapping("/authorize")
-
 	public String handleAuthorization(@RequestParam("organizationName") String organizationName,
-			@RequestParam("environment") String environment, HttpSession session, Model model) {
-		
-		
-		//clear existing ession to prevent old token from affecting login
+			@RequestParam("environment") String environment, HttpSession session, HttpServletRequest request,
+			Model model) {
+
 		session.invalidate();
+
+		// Start a new session
+		HttpSession newSession = request.getSession(true);
 		String clientId = orgConfigService.getClientId(organizationName);
 		String redirectUri = orgConfigService.getRedirectUri(organizationName);
-		
-		System.out.println(clientId + " " + redirectUri);
 
+		System.out.println(clientId + " " + redirectUri);
 		String authUrl = "https://login." + environment + "/oauth/authorize?response_type=token" + "&client_id="
-				+ clientId + "&redirect_uri=" + redirectUri;
+				+ clientId + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+				+ "&force_login=true";
 
 		// save the organizationName and environment in session
-		session.setAttribute("organizationName", organizationName);
-		session.setAttribute("environment", environment);
+		newSession.setAttribute("organizationName", organizationName);
+		newSession.setAttribute("environment", environment);
 
 		System.out.println(authUrl);
 
@@ -96,8 +103,8 @@ public class SkillController {
 	}
 
 	@GetMapping("/callbackServer")
-	public String handleServerCallback(@RequestParam("access_token") String accessToken, HttpSession session,
-			RedirectAttributes redirectAttributes) {
+	public String handleServerCallback(@RequestParam(value = "access_token", required = false) String accessToken,
+			HttpServletRequest request, HttpSession session, RedirectAttributes redirectAttributes) {
 
 		if (accessToken == null || accessToken.isEmpty()) {
 			redirectAttributes.addFlashAttribute("errorMessage", "Authorization failed. please try again.");
@@ -106,7 +113,7 @@ public class SkillController {
 
 		String organizationName = (String) session.getAttribute("organizationName");
 		String environment = (String) session.getAttribute("environment");
-		
+
 		// save accesstoken in the session
 		session.setAttribute("accessToken", accessToken);
 
@@ -118,57 +125,97 @@ public class SkillController {
 
 		try {
 			// Fetch logged-in user details
-			
+
 			UsersApi usersApi = new UsersApi(apiClient);
 			List<String> expand = Arrays.asList("");
 			String integrationPresenceSource = "";
 
 			UserMe currentUser = usersApi.getUsersMe(expand, integrationPresenceSource);
-			
 			session.setAttribute("currentUserId", currentUser.getId());
-			
-			//fetch user roles 
+
+			System.out.println(currentUser);
+
+			// fetch organization detail seperately
+			OrganizationApi organizationApi = new OrganizationApi(apiClient);
+			Organization organization = organizationApi.getOrganizationsMe();
+			String actualOrgName = organization.getName();
+			actualOrgName = actualOrgName.replace(" ", "");
+
+			System.out.println(actualOrgName);
+
+			// Validae that the Selected organization matches the actual logged -in org
+
+			if (!actualOrgName.equalsIgnoreCase(organizationName)) {
+				session.invalidate();
+				HttpSession newSession = request.getSession(true);// create new session
+
+				redirectAttributes.addFlashAttribute("errorMessage",
+						"Organization Validation failed. Please select the correct environment.");
+				return "redirect:/genesysContactCenter/login";
+			}
+
+			System.out.println(currentUser.getId());
+
+			// fetch user roles
 			AuthorizationApi authorizationApi = new AuthorizationApi(apiClient);
 			UserAuthorization userRoles = authorizationApi.getUserRoles(currentUser.getId());
-			
-			//Extract role names
-			List<String> rolesName = userRoles.getRoles().stream().map(DomainRole::getName).collect(Collectors.toList());
+			// Extract role names
+			List<String> rolesName = userRoles.getRoles().stream().map(DomainRole::getName)
+					.collect(Collectors.toList());
 			System.out.println(rolesName);
-			
-			//Extract role id(if needed)
+
+			// Extract role id(if needed)
 			List<String> rolesId = userRoles.getRoles().stream().map(DomainRole::getId).collect(Collectors.toList());
-			
-			
-			//Storing role names in session
+
+			// Storing role names in session
 			session.setAttribute("userRoles", rolesName);
-			
-			//check if user has the required role
-			
-			if(rolesName.contains(requriedRole)) {
-				redirectAttributes.addFlashAttribute("ConfirmationMessage", "Successfully connected to genesys." + organizationName);
+
+			// check if user has the required role
+
+			if (rolesName.contains(requriedRole)) {
+				redirectAttributes.addFlashAttribute("ConfirmationMessage",
+						"Successfully connected to genesys." + organizationName);
 				return "redirect:/genesysContactCenter/importOptions";
-			}else {
+			} else {
 				return "redirect:/genesysContactCenter/accessDenied";
 			}
-			
-			
-		}catch(Exception e) {
-			
-			redirectAttributes.addFlashAttribute("errorMessage", "Error retrieving user roles: "+e.getMessage());
+
+		} catch (Exception e) {
+
+			session.invalidate();// clear session in case of errors
+			HttpSession newSession = request.getSession(true);// Ensure fresh session
+			redirectAttributes.addFlashAttribute("errorMessage",
+					"Error retrieving user roles: " + e.getMessage() + e.fillInStackTrace());
 			return "redirect:/genesysContactCenter/login";
-			
+
 		}
 
-//		System.out.println(accessToken);
-//
-//		redirectAttributes.addFlashAttribute("confirmationMessage",
-//				" Successfully connected to Genesys org: " + organizationName);
-//		return "redirect:/genesysContactCenter/importOptions";
 	}
-	
+
+	@GetMapping("/logout")
+	public String logout(HttpServletRequest request, HttpSession session, Model model) {
+		String environment = (String) session.getAttribute("environment");
+		session.invalidate(); // clear session completely
+
+		String redirectAfterLogout = "http://localhost:8080/genesysContactCenter/login";
+		String genesysLogoutUrl = "https://login." + environment + "/logout?" + "redirect_uri="
+				+ URLEncoder.encode(redirectAfterLogout, StandardCharsets.UTF_8);
+
+		model.addAttribute("genesysLogoutUrl", genesysLogoutUrl);
+		model.addAttribute("redirectAfterLogout", redirectAfterLogout);
+
+		return "logoutPage";
+	}
+
+	@GetMapping("/afterLogout")
+	public String forceLogout() {
+		System.out.println("genesys logout complete. Redirecting to login page...");
+		return "redirect:/genesysContactCenter/login";
+	}
+
 	@GetMapping("/accessDenied")
 	public String accessDeniedPage(Model model) {
-		model.addAttribute("errorMessage"," You do not have permission to access this page");
+		model.addAttribute("errorMessage", " You do not have permission to access this page");
 		return "accessDenied";
 	}
 
@@ -388,8 +435,6 @@ public class SkillController {
 				return "login";
 			}
 
-			// System.out.println(orgConfigService.validateAccessToken(token, environment));
-			// System.out.println(token);
 			String token = (String) httpSession.getAttribute("accessToken");
 			if (token == null || !orgConfigService.validateAccessToken(token, environment)) {
 				throw new IllegalArgumentException(

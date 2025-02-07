@@ -38,17 +38,18 @@ public class UserService {
 
 		Map<String, String> credentials = orgConfigService.getCredentials(organizationName);
 		String clientId = credentials.get("clientId");
-		String clientSecret = credentials.get("clientSecret");
+		String redirectUri = credentials.get("redirectUri");
 
-		if (clientId == null || clientSecret == null) {
+		if (clientId == null || redirectUri == null) {
 			results.add("Error: Client Credentials not found for organization" + organizationName);
 			return results;
 		}
 
 		try {
-			ApiClient apiClient = ApiClient.Builder.standard().withBasePath("https://api." + environment).build();
-			apiClient.authorizeClientCredentials(clientId, clientSecret);
+			ApiClient apiClient = ApiClient.Builder.standard().withAccessToken(token)
+					.withBasePath("https://api." + environment).build();
 			Configuration.setDefaultApiClient(apiClient);
+
 
 			UsersApi usersApi = new UsersApi(apiClient);
 

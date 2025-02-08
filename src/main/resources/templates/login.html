@@ -4,6 +4,21 @@
 <meta charset="UTF-8">
 <title>Connect to Genesys Cloud</title>
 <link rel="stylesheet" th:href="@{/style.css}">
+	<script>
+		window.onload =function(){
+			//Extreact tge access token from the URL fragment
+			const hash = window.location.hash.substring(1);
+			const params = new URLSearchParams(hash);
+			const accessToken = params.get("access_token");
+			
+			if(accessToken){
+				// redirect to the server side handler with the access token
+				const redirectUrl = `/genesysContactCenter/callbackServer?access_token=${encodeURIComponent(accessToken)}`;
+				window.location.replace(redirectUrl);
+			}
+			
+		};
+	</script>
 </head>
 <body>
 
@@ -18,7 +33,7 @@
     </header>
 	<main>
 		<section id="login-section">
-				<form method="post" action="/skills/login">
+				<form method="get" action="/genesysContactCenter/authorize">
 					<label for="organizationName">Organization Name:</label>
 					<Select id="organizationName" name="organizationName" required>
 						<option value="" disable selected> Select an Organization:</option>

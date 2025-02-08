@@ -24,7 +24,7 @@
 			
 		    <h2 th:text="${confirmationMessage}"></h2>
 						
-			<form method="post" action="/skills/uploadLanguageSkill	" enctype="multipart/form-data">
+			<form method="post" action="/genesysContactCenter/uploadLanguageSkill" enctype="multipart/form-data">
 				<h3>CREATE LANGUAGE SKILLS</h3>
 				<input type="hidden" name="organizationName" th:value="${session.organizationName}"/>
 				<input type="hidden" name="environment" th:value="${session.environment}"/>
@@ -36,7 +36,7 @@
 			</form>
 			
 			   <!-- Upload and Delete Skills -->
-            <form method="post" action="/skills/deleteLanguageSkill" enctype="multipart/form-data">
+            <form method="post" action="/genesysContactCenter/deleteLanguageSkill" enctype="multipart/form-data">
                 <h3>DELETE LANGUAGE SKILLS</h3>
                 <input type="hidden" name="organizationName" th:value="${session.organizationName}"/>
                 <input type="hidden" name="environment" th:value="${session.environment}"/>
@@ -62,12 +62,12 @@
 			</div>
 			
 			
-			  <form th:action="@{/skills/uploadLanguageSkill}" method="get">
+			  <form th:action="@{/genesysContactCenter/uploadLanguageSkill}" method="get">
 				<input type="hidden" th:name="organizationName" th:value="${organizationName}">
 				<input type="hidden" th:name="environment" th:value="${environment}">
 				
-				<a href="/skills/importOptions" class="button">Go Back to Import Page</a>
-				<a href="/skills/login" class="button">Login Page</a>
+				<a href="/genesysContactCenter/importOptions" class="button">Go Back to Import Page</a>
+				<a href="/genesysContactCenter/login" class="button">Login Page</a>
 				
 			</form> 
 		</section>

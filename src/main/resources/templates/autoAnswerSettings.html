@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto-Answer Settings</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+</head>
+<body>
+    <header class="header">
+        <div class="logo-container">
+            <img th:src="@{/images/genesys-logo.png}" alt="Genesys Logo" class="logo">
+        </div>
+        <div class="page-title">
+            <h1>AUTO-ANSWER SETTINGS</h1>
+        </div>
+    </header>
+
+    <main>
+        <section>
+            <h2 th:text="${confirmationMessage}">Auto-Answer Settings</h2>
+            
+            <div class="table-container">
+                <table id="agentsTable" class="display">
+                    <thead>
+                        <tr>
+                            <th>Agent Name</th>
+                            <th>Email</th>
+                            <th>Auto-Answer</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="agent : ${agents}">
+                            <td th:text="${agent.get('name')}">Agent Name</td>
+                            <td th:text="${agent.get('email')}">agent@example.com</td>
+                            <td>
+                                <input type="checkbox" class="autoAnswerCheckbox" 
+    							th:checked="${agent.get('autoAnswerEnabled')}"
+   								 th:attr="data-userid=${agent.get('id')}"
+    								onchange="updateAutoAnswer(this)">
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <a th:href="@{/genesysContactCenter/importOptions}" class="button">Back to Import Options</a>
+        </section>
+    </main>
+
+    <script>
+        $(document).ready(function() {
+            $('#agentsTable').DataTable({
+                pageLength: 25,
+                responsive: true
+            });
+        });
+
+        function updateAutoAnswer(checkbox) {
+            const userId = $(checkbox).data('userid');
+            const enable = checkbox.checked;
+            
+            // Show loading state
+            $(checkbox).prop('disabled', true);
+            
+            // Create form data
+            const formData = new FormData();
+            formData.append('userId', userId);
+            formData.append('enable', enable);
+            
+            // Get CSRF token if enabled
+            const token = $("meta[name='_csrf']").attr("content");
+            const header = $("meta[name='_csrf_header']").attr("content");
+            
+            $.ajax({
+                url: '/genesysContactCenter/updateAutoAnswer',
+                type: 'POST',
+                data: formData,
+                processData: false,  // Important for FormData
+                contentType: false,  // Important for FormData
+                beforeSend: function(xhr) {
+                    if (header && token) {
+                        xhr.setRequestHeader(header, token);
+                    }
+                },
+                success: function(response) {
+                    if (response && response.status === 'success') {
+                        toastr.success(response.message);
+                    } else {
+                        checkbox.checked = !enable; // Revert on failure
+                        toastr.error(response?.message || 'Update failed');
+                    }
+                },
+                error: function(xhr) {
+                    checkbox.checked = !enable; // Revert on error
+                    let errorMsg = 'Error updating auto-answer';
+                    try {
+                        errorMsg = xhr.responseJSON?.message || 
+                                 JSON.parse(xhr.responseText)?.message || 
+                                 xhr.statusText || 
+                                 errorMsg;
+                    } catch (e) {
+                        console.error("Error parsing error response", e);
+                    }
+                    toastr.error(errorMsg);
+                },
+                complete: function() {
+                    $(checkbox).prop('disabled', false);
+                }
+            });
+        }
+        function handleUpdateError(checkbox, originalState) {
+            checkbox.checked = originalState;
+        }
+    </script>
+</body>
+</html>
